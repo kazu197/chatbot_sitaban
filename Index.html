@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSbot Si Taban - BPBD Samarinda</title>
+
+    <!-- Tailwind CSS untuk styling responsif dan estetis -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Lucide Icons untuk ikon visual -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            /* Pastikan body setinggi layar */
+            min-height: 100vh; 
+        }
+
+        /* Mengatur tinggi container utama agar terlihat jelas di preview */
+        #chat-container {
+            height: 90vh; 
+            min-height: 700px; /* Minimal tinggi agar selalu terlihat */
+            max-width: 1200px;
+        }
+
+        /* Warna utama BPBD, oranye */
+        .color-primary {
+            background-color: #FF7A00;
+        }
+        .text-primary {
+            color: #FF7A00;
+        }
+
+        /* Scrollbar styling for a cleaner look */
+        #messages-container::-webkit-scrollbar, #suggestions-sidebar::-webkit-scrollbar { width: 8px; }
+        #messages-container::-webkit-scrollbar-thumb, #suggestions-sidebar::-webkit-scrollbar-thumb { background-color: #FF7A00; border-radius: 4px; }
+        #messages-container::-webkit-scrollbar-track, #suggestions-sidebar::-webkit-scrollbar-track { background-color: #f1f1f1; }
+
+        /* Loader CSS */
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #FF7A00;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Animasi untuk tombol mikrofon saat aktif (Indikator Perekaman) */
+        .mic-active {
+            animation: pulse-border 1.5s infinite;
+        }
+        @keyframes pulse-border {
+            0% { box-shadow: 0 0 0 0px rgba(255, 122, 0, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 122, 0, 0); }
+            100% { box-shadow: 0 0 0 0px rgba(255, 122, 0, 0); }
+        }
+    </style>
+
+</head>
+<body class="p-4 md:p-8 flex items-center justify-center min-h-screen">
+
+    <!-- CONTAINER UTAMA: Fleksibel untuk dua kolom (Sidebar + Chat) -->
+    <!-- Tambahkan h-full untuk memastikan container mengambil tinggi dari parent (body) -->
+    <div id="chat-container" class="w-full h-full bg-white shadow-2xl rounded-xl flex flex-col overflow-hidden lg:flex-row">
+        
+        <!-- PANEL KIRI (SUGGESTION SIDEBAR) - Hanya terlihat di layar besar -->
+        <!-- Pastikan tinggi 100% dari container parent -->
+        <div id="suggestions-sidebar" 
+             class="hidden h-full lg:block lg:w-1/4 p-4 border-r border-gray-200 bg-gray-50 overflow-y-auto">
+            
+            <h2 class="text-lg font-bold text-primary mb-4 border-b pb-2">Saran Pertanyaan</h2>
+            
+            <!-- Tempat tombol saran di-render oleh JavaScript -->
+            <div id="suggestion-buttons" class="space-y-3">
+                <!-- Tombol saran akan di-inject di sini -->
+            </div>
+            
+            <div class="mt-6 pt-4 border-t text-xs text-gray-500 italic">
+                <p>Klik salah satu saran di atas untuk mengirim pertanyaan cepat.</p>
+            </div>
+        </div> <!-- Akhir Suggestions Sidebar -->
+        
+        <!-- PANEL KANAN (CHAT INTERFACE) - Mengambil sebagian besar ruang -->
+        <!-- Gunakan flex-grow dan h-full untuk memastikan ia mengisi sisa ruang secara vertikal dan horizontal -->
+        <div id="chat-panel" class="flex flex-col flex-grow h-full lg:w-3/4">
+            
+            <!-- HEADER -->
+            <header class="color-primary text-white p-4 flex items-center justify-between shadow-lg flex-shrink-0">
+                <div class="flex items-center">
+                    
+                    <!-- LOGO BPBD SAMARINDA -->
+                    <img src="https://bpbd.samarindakota.go.id/storage/Template/logo.png" 
+                        onerror="this.onerror=null;this.src='https://placehold.co/48x48/ffffff/FF7A00?text=BPBD';"
+                        alt="Logo BPBD Samarinda" 
+                        class="w-12 h-12 rounded-full object-cover mr-3 border-2 border-white p-0.5">
+                    
+                    <div>
+                        <h1 class="text-xl font-bold">CSbot Si Taban</h1>
+                        <p class="text-xs opacity-80">(Siaga Tangguh Bencana) BPBD Kota Samarinda</p>
+                    </div>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <p class="text-sm italic hidden sm:block">Status: Aktif</p>
+                </div>
+            </header>
+
+            <!-- PESAN CONTAINER -->
+            <!-- flex-grow agar mengisi sisa ruang di antara header dan input -->
+            <div id="messages-container" class="flex-grow p-4 space-y-4 overflow-y-auto">
+                <!-- Pesan akan di-render di sini -->
+            </div>
+
+            <!-- INPUT WRAPPER -->
+            <div id="input-area" class="p-4 border-t border-gray-200 flex-shrink-0">
+                <!-- Kontainer untuk Pratinjau File yang Diunggah -->
+                <div id="file-preview-container" class="mb-2 hidden">
+                    <!-- Pratinjau file akan muncul di sini -->
+                </div>
+                <form id="chat-form" class="flex space-x-3">
+                    
+                    <!-- UPLOAD FILE BUTTON -->
+                    <!-- Diberi class flex dan justify-center agar ikon di tengah -->
+                    <label for="file-input" class="flex items-center justify-center bg-gray-200 p-3 rounded-lg cursor-pointer hover:bg-gray-300">
+                        <i data-lucide="paperclip" class="w-5 h-5"></i>
+                        <!-- Menerima PDF, DOCX, XLSX, dan Gambar -->
+                        <input type="file" id="file-input" class="hidden" accept=".pdf,.doc,.docx,.xlsx,.jpg,.jpeg,.png,.webp">
+                    </label>
+
+                    <!-- SPEECH-TO-TEXT BUTTON (Tombol Mikrofon) -->
+                    <button type="button" id="mic-button"
+                        class="bg-gray-200 text-gray-700 p-3 rounded-lg flex items-center justify-center hover:bg-gray-300 transition duration-300 focus:outline-none">
+                        <i data-lucide="mic" id="mic-icon" class="w-5 h-5"></i>
+                    </button>
+
+                    <input type="text" id="user-input" placeholder="Ketik pesan, unggah file, atau tekan mikrofon untuk bicara..."
+                        class="flex-grow p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A00]">
+
+                    <button type="submit" id="send-button"
+                        class="color-primary text-white p-3 rounded-lg flex items-center justify-center hover:bg-orange-700 transition duration-300">
+                        <i data-lucide="send" class="w-5 h-5"></i>
+                    </button>
+                </form>
+            </div>
+
+        </div> <!-- Akhir Chat Panel -->
+        
+        
+        <!-- MODAL / MESSAGE BOX UNTUK ERROR/INFO (Pengganti alert()) -->
+        <div id="message-box" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center z-50">
+            <div class="bg-white p-6 rounded-xl max-w-sm w-full shadow-2xl">
+                <h3 id="message-title" class="text-lg font-bold mb-2 text-primary">Pesan</h3>
+                <p id="message-content" class="text-gray-700 mb-4">Ini adalah isi pesan.</p>
+                <button onclick="document.getElementById('message-box').classList.add('hidden'); document.getElementById('message-box').classList.remove('flex');"
+                        class="color-primary text-white px-4 py-2 rounded-lg hover:bg-orange-700 float-right">
+                    OK
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Gunakan variabel kosong untuk API Key. Sistem akan otomatis menyediakannya di runtime.
+        const MODEL_NAME = "gemini-2.5-flash-preview-09-2025";
+        const API_KEY = "AIzaSyBlWE5pHifmV9S76yqlUjMQlxv0VsfPfHQ"; // GANTI DENGAN KUNCI API ANDA YANG VALID
+        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${API_KEY}`;
+        
+        // Konstanta dan URL untuk Text-to-Speech (TTS)
+        const TTS_MODEL_NAME = "text-to-speech-2-flash";
+        const TTS_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${TTS_MODEL_NAME}:synthesizeSpeech?key=${API_KEY}`;
+
+
+        // Data saran pertanyaan
+        const SUGGESTION_QUERIES = [
+            "Apa itu Bencana",
+            "Apa itu BPBD Kota Samarinda?",
+            "Dimana alamat kantor BPBD Kota Samarinda",
+            "Berapa total kejadian longsor dari Jan-Okt 2025?",
+            "Nomor darurat BPBD Samarinda?"
+             
+        ];
+
+        // KONTEKS AWAL DARI DATA REKAPAN TAHUNAN BPBD SAMARINDA (JANUARI - OKTOBER 2025)
+        const INITIAL_KNOWLEDGE_BASE = `
+**DATA REKAPAN KEJADIAN BENCANA BPBD KOTA SAMARINDA TAHUN 2025 (JANUARI s/d OKTOBER)**
+
+---
+**REKAPITULASI BULAN JANUARI 2025**
+- Banjir: 5 Kali/Kejadian
+- Tanah Longsor: 47 Kali/Kejadian
+- Cuaca Extreme (Pohon Tumbang): 21 Kali/Kejadian
+- Korban Terdampak: 4057 KK (Kartu Keluarga), 13640 Jiwa
+- Keterangan Korban: NIHIL (diasumsikan jika tidak ada data spesifik KL/KS/KH/KM)
+- Lokasi Kejadian (Contoh): Jl. Ramania II RT. 47 Kel. Sidodadi (Tanah Longsor), Jl. Parikesit 2 Kel. Handi Bakti (Cuaca Extreme).
+
+---
+**REKAPITULASI BULAN FEBRUARI 2025**
+- Banjir: - Kali/Kejadian
+- Tanah Longsor: 24 Kali/Kejadian
+- Cuaca Extreme (Pohon Tumbang): 13 Kali/Kejadian
+- Korban Terdampak: 9 KK, 28 Jiwa
+- Keterangan Korban: NIHIL
+- Lokasi Kejadian (Contoh): Gunung Manggah Jln. Otto Iskandardinata Kel Sambutan (Tanah Longsor), Kuburan Muslim Jl. Sultan Sulaiman Kel. Sungai Pinang Dalam (Tanah Longsor - 45 Makam bergeser).
+
+---
+**REKAPITULASI BULAN MARET 2025**
+- Banjir: - Kali/Kejadian
+- Tanah Longsor: 5 Kali/Kejadian
+- Cuaca Extreme (Pohon Tumbang): 2 Kali/Kejadian
+- Korban Terdampak: 2 KK, 13 Jiwa
+- Keterangan Korban: NIHIL
+- Lokasi Kejadian (Contoh): Jln lubuk sawah GG bahari RT 15 No 47 Kel. Mugirejo (Tanah Longsor), Jl. Sukses RT.38 Kel. Mugirejo (Cuaca Extreme).
+
+---
+**REKAPITULASI BULAN APRIL 2025**
+- Banjir: 3 Kali/Kejadian
+- Tanah Longsor: 14 Kali/Kejadian
+- Cuaca Extreme (Pohon Tumbang): 12 Kali/Kejadian
+- Kebakaran Lahan: 1 Kali/Kejadian
+- Korban Terdampak: 7 KK, 23 Jiwa
+- Keterangan Korban: NIHIL
+- Lokasi Kejadian (Contoh): Jl. Ring Road 3 (Cuaca Extreme), Jl. Sultan Alimudin Rt.26 Kel. Selili (Cuaca Extreme).
+
+---
+**REKAPITULASI BULAN MEI 2025**
+- Banjir: 7 Kali/Kejadian
+- Tanah Longsor: 105 Kali/Kejadian
+- Cuaca Extreme (Pohon Tumbang): 12 Kali/Kejadian
+- Korban Luka (KL): 5 Orang
+- Korban Meninggal (KM): 8 Orang
+- Korban Terdampak: 6768 KK, 15899 Jiwa
+- Lokasi Kejadian (Contoh): Jl. Merapi, RT 14, Kel. Tanah Merah (Tanah Longsor), Perum bumi prestasi kencana (Cuaca Extreme menimpa mobil).
+
+---
+**REKAPITULASI BULAN JUNI 2025**
+- Banjir: - Kali/Kejadian
+- Tanah Longsor: 7 Kali/Kejadian
+- Cuaca Extreme (Pohon Tumbang): 10 Kali/Kejadian
+- Korban Terdampak: 16 KK, 73 Jiwa
+- Keterangan Korban: NIHIL
+- Lokasi Kejadian (Contoh): Jl. Kemangi Gg Syukur Kel. Karang Asam Ulu (Tanah Longsor), Gg. 23 Kel. Karang Asam Ulu (Cuaca Extreme).
+
+---
+**REKAPITULASI BULAN JULI 2025**
+- Banjir: - Kali/Kejadian
+- Tanah Longsor: 6 Kali/Kejadian
+- Cuaca Extreme (Pohon Tumbang): 5 Kali/Kejadian
+- Kebakaran Lahan: 5 Kali/Kejadian
+- Korban Terdampak: 3 KK, 11 Jiwa
+- Keterangan Korban: NIHIL
+- Lokasi Kejadian (Contoh): Jln. Markisa Gang 3 rt 08 Kel. Gunung kelua (Tanah Longsor), SDN 007 Kel. Selili (Pergerakan tanah).
+
+---
+**REKAPITULASI BULAN AGUSTUS 2025**
+- Banjir: - Kali/Kejadian
+- Tanah Longsor: 6 Kali/Kejadian
+- Cuaca Extreme (Pohon Tumbang): 5 Kali/Kejadian
+- Kebakaran Lahan: 5 Kali/Kejadian
+- Korban Terdampak: 8 KK, 29 Jiwa
+- Keterangan Korban: NIHIL
+- Lokasi Kejadian (Contoh): Jl.Kenyah Rt.15 Kel.Sempaja Selatan (Tanah Longsor), Jl. Lempake Jaya (Banjir).
+
+---
+**REKAPITULASI BULAN SEPTEMBER 2025**
+- Banjir: 4 Kali/Kejadian
+- Tanah Longsor: 11 Kali/Kejadian
+- Cuaca Extreme (Pohon Tumbang): 26 Kali/Kejadian
+- Korban Terdampak: 58 KK, 158 Jiwa
+- Keterangan Korban: NIHIL
+- Lokasi Kejadian (Contoh): Jl. Purwodadi Gg 14 Rt 10 Kel Lempake (Tanah Longsor), Jl. Cipto Mangunkusumo (Cuaca Extreme).
+
+---
+**REKAPITULASI BULAN OKTOBER 2025**
+- Banjir: 6 Kali/Kejadian
+- Tanah Longsor: 20 Kali/Kejadian
+- Cuaca Extreme (Pohon Tumbang): 21 Kali/Kejadian
+- Korban Terdampak: 532 KK, 1830 Jiwa
+- Keterangan Korban: NIHIL
+- Lokasi Kejadian (Contoh): Jln. Poros kampung budaya pampang (Cuaca Ekstrem), Jl. Lambung Mangkurat (Banjir).
+
+Susunan Pejabat BPBD Kota Samarinda
+Kepala Pelaksana: Suwarso, A.Ks, M.Si
+Sekretaris: Romiansyah, S.STP, M.Si
+Kepala Bidang Pencegahan dan Kesiapsiagaan: Ir. Mashul Akbar Sukamto, M.Si
+Kepala Bidang Kedaruratan dan Logistik: Edy Susanto, SE, MM
+Kepala Bidang Rehabilitasi dan Rekontruksi: Ifran, SH, M.Si
+Pengelola Sistem Informasi di Sub. Bagian Umum dan Kepegawaian: Rikko Ardatha Putra Purwanto, S.Kom
+Pengadministrasi Perkantoran di Bidang Pencegahan dan Kesiapsiagaan: Muhammad Noor Ansyari, S.Tr.Kom
+
+No Telpon BPBD Kota Samarinda: PUSDALOPS-PB 08115537007
+Alamat kantor: Jl. Sentosa Dalam No.1 Kel. Sungai Pinang Dalam Kec. Sungai Pinang 75117
+Website: bpbd.samarindakota.go.id
+Instagram: @bpbdkotasamarinda
+You Tube: BPBD Kota Samarinda
+Facebook: BPBD Samarinda
+
+Kajian Risiko Bencana
+Jenis Bencana,Tingkat Risiko (2022-2026),Catatan Penting
+Banjir,Tinggi ,"Potensi kerugian fisik dan kerusakan lingkungan tertinggi. Kerugian fisik total: Rp 486.862,82 Juta. Kerusakan lingkungan: 15.519,00 Ha."
+Tanah Longsor,Tinggi ,Merupakan salah satu bencana yang sering terjadi setiap tahun di Samarinda.
+Cuaca Ekstrim,Tinggi ,"Potensi kerugian total (fisik dan ekonomi) terbesar: Rp 612.131,92 Juta. Luasan bahaya mencakup seluruh wilayah kota, menyebabkan potensi penduduk terpapar sangat besar."
+Kekeringan,Tinggi ,"Luasan bahaya mencakup seluruh wilayah kota, menyebabkan potensi penduduk terpapar sangat besar."
+Kebakaran Hutan dan Lahan,Tinggi ,Bahaya terjadi di kawasan non-pemukiman.
+Konflik Sosial,Sedang ,"Potensi kerugian fisik dan ekonomi berada di kelas Sedang, dengan kerugian total mencapai Rp 374.014,66 Juta."
+Epidemi dan Wabah Penyakit,Rendah ,-
+
+KAPASITAS DAN KESIAPSIAGAAN
+Tingkat Kapasitas Daerah: Kota Samarinda memiliki tingkat kapasitas yang Sedang untuk semua jenis bencana.
+Indeks Kesiapsiagaan Masyarakat: Secara keseluruhan, indeks kesiapsiagaan masyarakat terhadap semua bahaya cenderung berada pada kelas Rendah. Hal ini mengindikasikan perlunya peningkatan level kesiapsiagaan masyarakat guna meminimalisir kerugian yang mungkin terjadi.
+
+REKOMENDASI KEBIJAKAN UTAMA (8 Strategi)
+Pemerintah Kota Samarinda perlu menerbitkan kebijakan yang terkait penanggulangan bencana berdasarkan 8 strategi utama:
+Mempercepat pembangunan Sistem Peringatan Dini Nasional untuk bencana alam.
+Meningkatkan kapasitas masyarakat melalui program pembentukan Desa Tangguh Bencana.
+Meningkatkan ketersediaan logistik dan peralatan kebencanaan daerah.
+Meningkatkan jumlah kajian risiko bencana.
+Meningkatkan kesiapan sumber daya nasional dalam menghadapi keadaan darurat bencana (pendidikan, pelatihan, dll.).
+Percepatan pemulihan pascabencana.
+Mengkoordinasikan upaya-upaya khusus untuk pengurangan dampak bencana hidrometeorologi (seperti banjir, cuaca ekstrim, kekeringan).
+Catatan: Dokumen juga menyebutkan pembangunan sistem logistik kebencanaan nasional di 6 wilayah pulau, yang merupakan bagian dari strategi yang lebih luas.
+
+Katana dan Destana di Kota Samarinda
+Kelompok Pembentukan,Nama DESTANA/KATANA,Keterangan,Nama Ketua,Nomor Aktif
+DIBENTUK BNPB TAHUN 2016,DESTANA SUNGAI KAPIH,AKTIF,MAWAR HANDAYANI,081258583998
+DIBENTUK BNPB TAHUN 2016,DESTANA MAKROMAN,AKTIF,ISMAIL,
+DIBENTUK BNPB TAHUN 2016,DESTANA LEMPAKE,AKTIF,nan,
+DIBENTUK BNPB TAHUN 2016,DESTANA SUNGAI SIRING,TIDAK AKTIF,nan,
+DIBENTUK BPBD KOTA SAMARINDA TAHUN 2019,KATANA GUNUNG LINGAI,AKTIF,NURDIN,
+DIBENTUK BPBD KOTA SAMARINDA TAHUN 2019,KATANA SUNGAI PINANG DALAM,AKTIF,nan,
+DIBENTUK BPBD KOTA SAMARINDA TAHUN 2019,KATANA TEMINDUNG PERMAI,AKTIF,DARMAWAN,
+DIBENTUK BPBD KOTA SAMARINDA TAHUN 2019,KATANA SEMPAJA TIMUR,AKTIF,nan,
+DIBENTUK BPBD PROVINSI KALTIM TAHUN 2021,KATANA TELUK LERONG ULU,AKTIF,REZA,
+DIBENTUK BPBD PROVINSI KALTIM TAHUN 2021,KATANA BANDARA,AKTIF,YUSRAN,
+`;
+
+        const chatForm = document.getElementById("chat-form");
+        const userInput = document.getElementById("user-input");
+        const messagesContainer = document.getElementById("messages-container");
+        const sendButton = document.getElementById("send-button");
+        const fileInput = document.getElementById("file-input");
+        const micButton = document.getElementById("mic-button"); 
+        const micIcon = document.getElementById("mic-icon");     
+        const suggestionContainer = document.getElementById("suggestion-buttons"); 
+
+        let currentAudioSource = null; 
+        let chatHistory = [];
+        let uploadedFile = null;
+        let currentLoadingElement = null;
+
+        // Tambahkan konteks pengetahuan ke riwayat percakapan sebagai pesan sistem
+        chatHistory.push({
+            role: "user",
+            parts: [{ text: `KONTEKS DATA BENCANA (Knowledge Base): ${INITIAL_KNOWLEDGE_BASE}` }]
+        });
+        chatHistory.push({
+            role: "model",
+            parts: [{ text: "Terima kasih, data rekapan bencana BPBD Kota Samarinda tahun 2025 telah berhasil dimuat sebagai referensi utama. Saya akan menggunakan data ini saat menjawab pertanyaan spesifik terkait bencana di Samarinda." }]
+        });
+        
+        let recordingDurationTimeout = null; 
+        let countdownInterval = null; 
+        let isRecording = false; 
+        let finalTranscriptSet = false; 
+
+        // FUNGSI UMUM
+        function showMessageBox(title, content) {
+            document.getElementById('message-title').textContent = title;
+            document.getElementById('message-content').innerHTML = content;
+            document.getElementById('message-box').classList.remove('hidden');
+            document.getElementById('message-box').classList.add('flex');
+        }
+        
+        function createMessageElement(content, sender) {
+            const isUser = sender === 'user';
+            const alignment = isUser ? 'justify-end' : 'justify-start';
+            const bgColor = isUser ? 'bg-[#FF7A00]' : 'bg-white'; // Warna oranye untuk user, putih untuk bot
+            const textColor = isUser ? 'text-white' : 'text-gray-800';
+            const rounded = isUser ? 'rounded-tl-xl rounded-b-xl' : 'rounded-tr-xl rounded-b-xl shadow'; // Rounded corners yang berbeda
+            
+            // Struktur dasar pesan
+            const messageWrapper = document.createElement('div');
+            messageWrapper.className = `flex ${alignment} max-w-full` ; 
+
+            const messageBubble = document.createElement('div'); 
+            // Menambahkan whitespace-pre-wrap agar <br> bekerja dan teks panjang tidak keluar batas
+            messageBubble.className = `p-3 ${bgColor} ${textColor} ${rounded} whitespace-pre-wrap`;
+            messageBubble.innerHTML = content;
+
+            // Jika bot, tambahkan avatar/logo
+            if (!isUser) {
+                 const avatar = document.createElement('img');
+                 avatar.src = "https://bpbd.samarindakota.go.id/storage/Template/logo.png";
+                 avatar.onerror = function() { this.onerror=null;this.src='https://placehold.co/32x32/FF7A00/ffffff?text=B'; };
+                 avatar.alt = "Bot Avatar";
+                 avatar.className = 'w-8 h-8 rounded-full object-cover mr-2 flex-shrink-0 mt-auto';
+
+                 const contentWrapper = document.createElement('div');
+                 contentWrapper.className = 'flex';
+                 contentWrapper.appendChild(avatar);
+                 contentWrapper.appendChild(messageBubble);
+                 messageWrapper.appendChild(contentWrapper);
+            } else {
+                 messageWrapper.appendChild(messageBubble);
+            }
+            
+            return messageWrapper;
+        }
+
+        function appendMessage(text, sender) {
+            const element = createMessageElement(text, sender);
+            messagesContainer.appendChild(element);
+            scrollToBottom();
+            return element; // Kembalikan elemen untuk manipulasi selanjutnya (misal: loader)
+        }
+        
+        // FUNGSI: Scroll ke bawah
+        function scrollToBottom() {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // FUNGSI: Memberikan suara beep untuk indikasi mulai/selesai rekam
+        function playBeep(frequency = 600, duration = 0.1, volume = 0.1) {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContext) return; 
+                const context = new AudioContext();
+                const oscillator = context.createOscillator();
+                const gain = context.createGain();
+                oscillator.connect(gain);
+                gain.connect(context.destination);
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(frequency, context.currentTime);
+                gain.gain.setValueAtTime(volume, context.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.00001, context.currentTime + duration);
+                oscillator.start(context.currentTime);
+                oscillator.stop(context.currentTime + duration);
+            } catch (e) {
+                console.warn("Web Audio API tidak didukung atau terjadi kesalahan:", e);
+            }
+        }
+
+        // FUNGSI: Membersihkan state perekaman
+        function cleanUpRecordingState() {
+            if (recordingDurationTimeout) {
+                clearTimeout(recordingDurationTimeout);
+                recordingDurationTimeout = null;
+            }
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+                countdownInterval = null;
+            }
+
+            isRecording = false; 
+            finalTranscriptSet = false; 
+            micButton.classList.remove('color-primary', 'text-white', 'mic-active');
+            micButton.classList.add('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
+            // Hanya reset placeholder jika input masih kosong (untuk mencegah reset teks hasil STT)
+            if (userInput.value.trim() === "") {
+                userInput.placeholder = "Ketik pesan, unggah file, atau tekan mikrofon untuk bicara...";
+            }
+        }
+
+        // LOGIKA SPEECH-TO-TEXT (STT) 
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let recognition = null;
+
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.lang = 'id-ID'; // Set bahasa Indonesia
+            recognition.interimResults = false; 
+            recognition.maxAlternatives = 1;
+
+            recognition.onstart = () => {
+                isRecording = true;
+                finalTranscriptSet = false; // Reset flag saat mulai
+                micButton.classList.add('color-primary', 'text-white', 'mic-active');
+                micButton.classList.remove('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
+                playBeep(650, 0.1); 
+            };
+
+            // KRITIKAL: FUNGSI UNTUK MENULISKAN SUARA KE TEXTBOX
+            recognition.onresult = (event) => {
+                let finalTranscript = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    finalTranscript += event.results[i][0].transcript;
+                }
+                const transcript = finalTranscript.trim();
+                
+                if (transcript) {
+                    // Masukkan hasil transkripsi ke input
+                    userInput.value = transcript;
+                    finalTranscriptSet = true;
+                    // Hentikan rekaman dan langsung kirim setelah hasil didapat
+                    recognition.stop(); // Ini akan memicu onend, tapi logika utama sudah di sini
+                    chatForm.dispatchEvent(new Event('submit', { cancelable: true }));
+                }
+            };
+            recognition.onerror = (event) => {
+                console.error('Speech recognition error', event.error);
+                let errorMessage = "Terjadi kesalahan pada pengenalan suara.";
+                if (event.error === 'not-allowed') {
+                    errorMessage = "Akses mikrofon ditolak. Mohon izinkan browser Anda menggunakan mikrofon.";
+                } else if (event.error === 'no-speech') {
+                    errorMessage = "Tidak ada suara terdeteksi. Silakan coba lagi.";
+                }
+                showMessageBox("Kesalahan Mikrofon", errorMessage);
+                // Pastikan status rekaman dihentikan, tapi jangan hapus teks jika sudah ada
+                cleanUpRecordingState(); 
+            };
+            
+            recognition.onend = () => {
+                playBeep(440, 0.1, 0.05); // Suara beep untuk stop
+                // Hanya bersihkan state. Logika pengiriman sudah pindah ke onresult.
+                cleanUpRecordingState();
+                userInput.focus(); 
+            };
+
+        } else {
+            // Sembunyikan tombol mikrofon jika STT tidak didukung browser
+            micButton.style.display = 'none';
+        }
+
+        // FUNGSI: Memulai perekaman dan mengatur batas waktu
+        function startRecordingWithDuration() {
+            if (!recognition || isRecording) return;
+
+            // Bersihkan teks input jika tombol mikrofon diklik saat input kosong
+            if (userInput.value.trim() === "") userInput.value = ""; 
+
+            try {
+                recognition.start(); 
+            } catch (e) {
+                console.error("Error starting recognition:", e);
+                showMessageBox("Gagal Memulai Perekaman", "Gagal memulai perekaman suara. Pastikan Anda memberikan izin mikrofon.");
+                return;
+            }
+            
+            let duration = 5; // Durasi maksimum 5 detik
+            userInput.placeholder = `Merekam... Berbicara (Sisa: ${duration} detik).`;
+            
+            countdownInterval = setInterval(() => {
+                duration--;
+                if (duration >= 0) {
+                    userInput.placeholder = `Merekam... Berbicara (Sisa: ${duration} detik).`;
+                }
+                
+                if (duration < 0) {
+                     clearInterval(countdownInterval);
+                     countdownInterval = null;
+                }
+            }, 1000);
+
+            // Stop otomatis setelah 5 detik
+            recordingDurationTimeout = setTimeout(() => {
+                if (isRecording) {
+                    recognition.stop(); 
+                }
+            }, 5000);
+        }
+
+        // FUNGSI: Menghentikan perekaman secara manual
+        function manualStopRecording() {
+            if (isRecording) {
+                // Coba hentikan rekaman. Ini akan memicu onend event.
+                recognition.stop();
+            } else {
+                // Jika sudah berhenti (misalnya timeout sudah jalan duluan), bersihkan saja state
+                cleanUpRecordingState();
+            }
+        }
+
+        // EVENT LISTENER UNTUK TOMBOL MIKROFON
+        micButton.addEventListener('click', () => {
+            if (!recognition) {
+                showMessageBox("Peringatan", "Fitur Ucapan ke Teks tidak didukung oleh browser Anda.");
+                return;
+            }
+
+            if (isRecording) { 
+                manualStopRecording();
+                userInput.placeholder = "Perekaman dihentikan secara manual.";
+            } else {
+                startRecordingWithDuration();
+            }
+        });
+
+        // FUNGSI: Merender tombol saran (sekarang menargetkan sidebar)
+        function renderSuggestions() {
+            SUGGESTION_QUERIES.forEach(query => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.textContent = query;
+                // Styling diubah agar lebih cocok sebagai list di sidebar
+                button.className = 'w-full text-left px-3 py-2 text-sm bg-orange-100 text-primary border border-primary rounded-lg shadow-sm hover:bg-orange-200 transition duration-150 block';
+                
+                button.addEventListener('click', () => {
+                    userInput.value = query;
+                    // Trigger submit form
+                    chatForm.dispatchEvent(new Event('submit', { cancelable: true })); 
+                });
+                
+                suggestionContainer.appendChild(button);
+            });
+        }
+
+
+        // =========================================================
+        // LOGIKA TEXT-TO-SPEECH (TTS)
+        // =========================================================
+
+        // FUNGSI: Menghentikan audio yang sedang diputar
+        function stopSpeaking() {
+            if (currentAudioSource) {
+                try {
+                    // Hentikan pemutaran
+                    if (typeof currentAudioSource.pause === 'function') {
+                        currentAudioSource.pause();
+                        currentAudioSource.currentTime = 0; 
+                    }
+                    // Hapus URL objek untuk membebaskan memori
+                    if (currentAudioSource.src.startsWith('blob:')) {
+                         URL.revokeObjectURL(currentAudioSource.src);
+                    }
+                } catch (e) {
+                    console.warn("Gagal menghentikan audio:", e);
+                }
+            }
+            currentAudioSource = null;
+        }
+        
+        // FUNGSI UTAMA TTS: Memanggil API dan memutar suara
+        async function speakText(text) {
+            // Hentikan pemutaran sebelumnya (penting saat mengganti audio baru)
+            stopSpeaking(); 
+            
+            // Jangan memutar jika teks kosong atau hanya spasi
+            if (!text || text.trim() === "") return;
+            
+
+            // Payload yang benar untuk metode synthesizeSpeech
+            const payload = {
+                text: text,
+                voice: {
+                    name: "Charon" // Menggunakan suara yang jelas dan informatif
+                },
+                audioConfig: { audioEncoding: "MP3" }
+            };
+            console.log("TTS Payload:", JSON.stringify(payload)); // Tambahkan log untuk payload
+
+            try {
+                let res;
+                let data;
+                const maxRetries = 3;
+                let delay = 1000; 
+                
+                // Mekanisme Exponential Backoff untuk mengatasi throttling
+                for (let attempt = 0; attempt < maxRetries; attempt++) {
+                    res = await fetch(TTS_API_URL, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (res.ok) {
+                        data = await res.json();
+                        break; 
+                    }
+
+                    if (attempt < maxRetries - 1 && res.status === 429) {
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        delay *= 2; 
+                    } else {
+                        throw new Error(`TTS API Error: ${res.status} ${res.statusText}`);
+                    }
+                }
+                
+                console.log("TTS Response:", data); // Tambahkan log untuk response
+                if (!data) {
+                    throw new Error("Gagal mendapatkan respons TTS setelah semua percobaan.");
+                }
+
+                const audioContent = data?.audioContent;
+
+                if (audioContent) {
+                    const audioUri = `data:audio/mp3;base64,${audioContent}`;
+                    console.log("Audio URI (dari base64) berhasil dibuat.");
+                    
+                    // Mainkan audio
+                    const audio = new Audio(audioUri);
+                    audio.play().catch(e => {
+                        console.error("Gagal memutar audio:", e);
+                        showMessageBox("Kesalahan Pemutaran Suara", "Terjadi kesalahan saat memutar suara. Mohon coba lagi.");
+                    });
+                    
+                    // Ketika audio selesai, reset referensi
+                    audio.onended = () => {
+                        currentAudioSource = null;
+                    };
+                    
+                    currentAudioSource = audio; 
+                } else {
+                    console.warn("Respons TTS tidak valid atau audio data tidak ditemukan.");
+                }
+
+            } catch (err) {
+                console.error("Kesalahan saat memanggil TTS API:", err);
+            }
+        }
+        
+        // =========================================================
+        // LOGIKA PENGIRIMAN PESAN DAN FILE (Chat Logic)
+        // =========================================================
+
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    resolve(reader.result.split(",")[1]);
+                };
+                reader.onerror = error => reject(error);
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // FUNGSI: Mengirim pesan ke Gemini
+        async function sendMessageToGemini(userMessage, fileData = null) {
+            // 1. Buat konten pesan pengguna untuk ditampilkan di UI
+            let displayMessage = userMessage;
+            if (fileData) {
+                let filePreviewHtml = '';
+                // Jika file adalah gambar, tampilkan thumbnail
+                if (fileData.mimeType.startsWith('image/')) {
+                    const imageSrc = `data:${fileData.mimeType};base64,${fileData.base64}`;
+                    filePreviewHtml = `<img src="${imageSrc}" alt="${fileData.name}" class="mt-2 rounded-lg max-w-xs max-h-48 object-cover" />`;
+                } else {
+                    // Jika bukan gambar, tampilkan ikon dan nama file
+                    filePreviewHtml = `<div class="mt-2 p-2 bg-orange-500 rounded-lg flex items-center text-white">
+                                           <i data-lucide="file" class="w-5 h-5 mr-2 flex-shrink-0"></i>
+                                           <span class="text-sm truncate font-medium">${fileData.name}</span>
+                                       </div>`;
+                }
+                displayMessage = `${userMessage}<br>${filePreviewHtml}`;
+            }
+            appendMessage(displayMessage, 'user');
+            
+            // Siapkan parts untuk pesan user (teks dan file)
+            const newUserParts = [{ text: userMessage }];
+            
+            if (fileData) {
+                newUserParts.push({
+                    inlineData: {
+                        mimeType: fileData.mimeType,
+                        data: fileData.base64
+                    }
+                });
+            }
+
+            // Tambahkan pesan pengguna ke riwayat untuk Gemini
+            chatHistory.push({ role: "user", parts: newUserParts });
+
+            // 2. Tampilkan loader dan buat elemen pesan bot
+            const botMessageElement = createMessageElement('<div class="flex items-center space-x-2"><div class="loader"></div><span>Menunggu respon...</span></div>', 'model');
+            messagesContainer.appendChild(botMessageElement);
+            currentLoadingElement = botMessageElement.querySelector('.whitespace-pre-wrap'); // Target the actual message bubble
+            // Render ikon jika ada di dalam pesan pengguna (misal: ikon file)
+            lucide.createIcons();
+            scrollToBottom();
+            
+            // Hapus file dari state setelah disiapkan
+            uploadedFile = null;
+            
+            // 3. Persiapan payload API
+            const payload = {
+                contents: chatHistory,
+                // Menggunakan Google Search untuk grounding (informasi terkini atau umum)
+                tools: [{ "google_search": {} }], 
+            };
+            
+            let responseText = "Maaf, terjadi kesalahan saat menghubungi server AI. Mohon coba lagi.";
+            let sources = [];
+            const maxRetries = 3;
+            let delay = 1000; 
+
+            // 4. Panggilan API dengan Exponential Backoff
+            for (let attempt = 0; attempt < maxRetries; attempt++) {
+                try {
+                    const res = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (res.ok) {
+                        const result = await res.json();
+                        const candidate = result.candidates?.[0];
+
+                        if (candidate && candidate.content?.parts?.[0]?.text) {
+                            // Menghapus semua karakter bintang (*) dari respons mentah
+                            responseText = candidate.content.parts[0].text.replace(/\*/g, '');
+                            
+                            // Ekstraksi sumber grounding (jika ada)
+                            const groundingMetadata = candidate.groundingMetadata;
+                            if (groundingMetadata && groundingMetadata.groundingAttributions) {
+                                sources = groundingMetadata.groundingAttributions
+                                    .map(attribution => ({
+                                        uri: attribution.web?.uri,
+                                        title: attribution.web?.title,
+                                    }))
+                                    .filter(source => source.uri && source.title); 
+                            }
+                            
+                            // Jika berhasil, keluar dari loop
+                            break; 
+                        } else {
+                             responseText = "Maaf, respons dari AI tidak mengandung teks yang valid.";
+                        }
+                    } else if (res.status === 429 && attempt < maxRetries - 1) {
+                        // Retry for rate limiting (429)
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        delay *= 2; // Double the delay
+                    } else {
+                        // Handle other non-429 errors
+                        responseText = `Kesalahan API: ${res.status} ${res.statusText}`;
+                        break;
+                    }
+                } catch (error) {
+                    console.error("Fetch error:", error);
+                    responseText = "Gagal mengambil data dari server. Periksa koneksi Anda.";
+                    break;
+                }
+            }
+            
+            // 5. Format respons dengan sumber (jika ada)
+            // Mengganti newline dengan <br> untuk tampilan yang baik di HTML
+            let finalResponseHtml = responseText.replace(/\n/g, '<br>'); 
+            
+            if (sources.length > 0) {
+                const sourceList = sources.map((s, index) => 
+                    `<li><a href="${s.uri}" target="_blank" class="text-blue-600 hover:underline">${s.title || `Sumber ${index + 1}`}</a></li>`
+                ).join('');
+                
+                finalResponseHtml += `<div class="mt-3 pt-3 border-t border-gray-200 text-xs text-gray-600">
+                                         <p class="font-semibold">Sumber Informasi Ditemukan:</p>
+                                         <ul class="list-disc pl-5 space-y-0.5">${sourceList}</ul>
+                                     </div>`;
+            }
+
+            // 6. Update UI dan Riwayat Chat
+            
+            // Update elemen loader
+            if (currentLoadingElement) {
+                currentLoadingElement.innerHTML = finalResponseHtml;
+                
+                // Dapatkan wrapper konten (yang berisi avatar dan gelembung pesan)
+                const contentWrapper = currentLoadingElement.parentElement;
+                if (contentWrapper && contentWrapper.classList.contains('flex')) {
+                    // Buat kontainer untuk tombol-tombol (baca dan salin)
+                    const buttonContainer = document.createElement('div');
+                    buttonContainer.className = 'flex flex-col space-y-1 ml-2 self-end mb-2'; // Tata letak kolom, margin, dan alignment
+
+                    // 1. Buat Tombol Baca (TTS)
+                    const speakButton = document.createElement('button');
+                    speakButton.innerHTML = '<i data-lucide="volume-2" class="w-4 h-4"></i>';
+                    speakButton.className = 'p-1 bg-gray-200 hover:bg-gray-300 rounded';
+                    speakButton.title = 'Baca teks';
+                    speakButton.addEventListener('click', () => {
+                        // Tambahkan feedback suara saat tombol diklik
+                        playBeep(800, 0.05, 0.1); 
+                        // Panggil fungsi TTS dengan teks bersih (tanpa HTML)
+                        speakText(responseText);
+                    });
+
+                    // 2. Buat Tombol Salin
+                    const copyButton = document.createElement('button');
+                    copyButton.innerHTML = '<i data-lucide="copy" class="w-4 h-4"></i>';
+                    copyButton.className = 'p-1 bg-gray-200 hover:bg-gray-300 rounded';
+                    copyButton.title = 'Salin teks';
+                    copyButton.addEventListener('click', () => {
+                        navigator.clipboard.writeText(responseText).then(() => {
+                            showMessageBox("Teks Disalin", "Teks telah disalin ke clipboard!");
+                        }).catch(err => console.error('Gagal menyalin teks: ', err));
+                    });
+
+                    // Tambahkan tombol ke kontainer (tombol baca di atas tombol salin)
+                    buttonContainer.appendChild(speakButton);
+                    buttonContainer.appendChild(copyButton);
+                    contentWrapper.appendChild(buttonContainer);
+                    lucide.createIcons(); // Render semua ikon baru
+                }
+            }
+            // Tambahkan respons bot (teks murni) ke riwayat, tanpa HTML atau citation
+            chatHistory.push({ role: "model", parts: [{ text: responseText }] });
+            
+            // Reset loader state
+            currentLoadingElement = null; 
+            scrollToBottom();
+            
+            // Kosongkan input setelah pengiriman 
+            userInput.value = "";
+            userInput.focus();
+        }
+
+        // FUNGSI: Menangani pengiriman formulir
+        chatForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const message = userInput.value.trim();
+            if (!message && !uploadedFile) {
+                userInput.focus();
+                return;
+            }
+            
+            // Kirim pesan, sertakan file jika ada
+            sendMessageToGemini(message, uploadedFile);
+            
+            // Reset UI untuk file
+            const fileLabel = document.querySelector('label[for="file-input"]');
+            fileLabel.classList.remove('bg-green-500', 'text-white');
+            document.getElementById('file-preview-container').classList.add('hidden'); // Sembunyikan preview
+            fileLabel.classList.add('bg-gray-200');
+            fileInput.value = ''; // Reset input file
+            uploadedFile = null; // Clear state
+        });
+        
+        // FUNGSI: Menangani input file
+        fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                // Batasan ukuran file (misal 5MB)
+                const maxSize = 5 * 1024 * 1024; 
+                if (file.size > maxSize) {
+                    showMessageBox("Batas Ukuran File", "Ukuran file maksimum adalah **5MB**. Silakan pilih file yang lebih kecil.");
+                    e.target.value = ''; 
+                    uploadedFile = null;
+                    return;
+                }
+                
+                const fileLabel = document.querySelector('label[for="file-input"]');
+                const previewContainer = document.getElementById('file-preview-container');
+                try {
+                    const base64Data = await fileToBase64(file);
+                    uploadedFile = {
+                        name: file.name,
+                        mimeType: file.type,
+                        base64: base64Data
+                    };
+                    
+                    // Buat HTML untuk pratinjau
+                    let previewHtml = '';
+                    if (file.type.startsWith('image/')) {
+                        const imageSrc = `data:${file.type};base64,${base64Data}`;
+                        previewHtml = `<img src="${imageSrc}" class="h-16 w-16 object-cover rounded-md mr-3">`;
+                    } else {
+                        previewHtml = `<div class="p-3 bg-gray-100 rounded-md mr-3 flex items-center justify-center"><i data-lucide="file" class="w-8 h-8 text-gray-500"></i></div>`;
+                    }
+
+                    previewContainer.innerHTML = `
+                        <div class="bg-gray-100 border border-gray-300 rounded-lg p-2 flex items-center justify-between animate-pulse-once">
+                            <div class="flex items-center overflow-hidden">
+                                ${previewHtml}
+                                <div class="text-sm text-gray-700 truncate">
+                                    <p class="font-medium truncate">${file.name}</p>
+                                    <p class="text-xs text-gray-500">${(file.size / 1024).toFixed(2)} KB</p>
+                                </div>
+                            </div>
+                            <button type="button" id="remove-file-btn" class="p-1 text-gray-500 hover:text-red-600 hover:bg-gray-200 rounded-full flex-shrink-0 ml-2">
+                                <i data-lucide="x" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                    `;
+                    previewContainer.classList.remove('hidden');
+                    lucide.createIcons(); // Render ikon X dan file
+
+                    // Tambahkan event listener untuk tombol hapus
+                    document.getElementById('remove-file-btn').addEventListener('click', () => {
+                        uploadedFile = null;
+                        e.target.value = ''; // Reset input file
+                        previewContainer.innerHTML = '';
+                        previewContainer.classList.add('hidden');
+                        fileLabel.classList.remove('bg-green-500', 'text-white', 'hover:bg-green-600');
+                    });
+
+                    // Update UI untuk menunjukkan file berhasil dimuat
+                    fileLabel.classList.remove('bg-gray-200', 'hover:bg-gray-300');
+                    fileLabel.classList.add('bg-green-500', 'text-white', 'hover:bg-green-600');
+                    
+                } catch (error) {
+                    console.error("Error converting file to base64:", error);
+                    showMessageBox("Gagal Memuat File", "Terjadi kesalahan saat memproses file. Mohon coba lagi.");
+                    fileLabel.classList.remove('bg-green-500', 'text-white', 'hover:bg-green-600');
+                    fileLabel.classList.add('bg-gray-200', 'hover:bg-gray-300');
+                    e.target.value = ''; 
+                    uploadedFile = null;
+                }
+            }
+        });
+        
+        // FUNGSI: App Initialization
+        function initApp() {
+            // Render ikon Lucide
+            lucide.createIcons();
+            // Render tombol saran
+            renderSuggestions();
+            
+            // Teks pesan selamat datang yang baru
+            const welcomeMessage = `Halo! Saya CSbot Si Taban (Siaga Tangguh Bencana) BPBD Kota Samarinda.
+
+Silakan masukkan pertanyaan Anda, atau klik tombol saran pertanyaan di samping.`;
+
+            // Buat elemen pesan selamat datang
+            const welcomeElement = appendMessage(welcomeMessage, 'model');
+
+            // Tambahkan tombol salin secara spesifik untuk pesan selamat datang
+            const contentWrapper = welcomeElement.querySelector('.flex');
+            if (contentWrapper) {
+                const copyButton = document.createElement('button');
+                copyButton.innerHTML = '<i data-lucide="copy" class="w-4 h-4"></i>';
+                copyButton.className = 'ml-2 p-1 bg-gray-200 hover:bg-gray-300 rounded self-end mb-2';
+                copyButton.addEventListener('click', () => {
+                    navigator.clipboard.writeText(welcomeMessage).then(() => {
+                        showMessageBox("Teks Disalin", "Teks telah disalin ke clipboard!");
+                    }).catch(err => console.error('Gagal menyalin teks: ', err));
+                });
+                contentWrapper.appendChild(copyButton);
+                lucide.createIcons();
+            }
+            
+        }
+        
+        // Panggil inisialisasi aplikasi saat DOM siap
+        window.addEventListener('load', initApp);
+    </script>
+
+</body>
+</html>
